@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Từ điển Hàn-Việt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #f7f6f2; --sidebar-bg: #ffffff; --detail-bg: #f7f6f2;
+      --border: #e4e0d8; --accent: #2563eb; --accent2: #7c3aed;
+      --text: #1a1a1a; --text-muted: #7a7068; --text-light: #b0a898;
+      --usage-bg: #ffffff; --note-bg: #fdf6f0; --note-border: #e67e22;
+      --morph-bg: #f0f4ff; --morph-border: #3b5bdb;
+      --tag-bg: #eef2ff; --tag-color: #364fc7; --active-bg: #2563eb;
+      --ref-bg: #fff8e1; --ref-color: #b5451b; --ref-border: #f5a623;
+      --def-bg: #4a7c59; --def-color: #f0f5f1;
+      --content-bg: #d4edda; --content-color: #1b3a2a;
+      --def-link-color: #ff9800; --def-link-hover: #ffb74d;
+      --content-link-color: #e65100; --content-link-hover: #ff6d00;
+      --bold-color: #2563eb;
+      --vi-bg: #f0fdf4; --vi-border: #22c55e; --vi-color: #15803d;
+      --ko-color: #9ca3af;
+      --section-blue: #0f3d91; --section-blue-contrast: #ffffff;
+      --font-size: 15px;
+      --font-body: 'Be Vietnam Pro', sans-serif;
+      --font-korean: 'Noto Serif KR', serif;
+      --sidebar-width: 260px;
+      --history-width: 130px;
+    }
+    [data-theme="dark"] {
+      --bg: #1a1814; --sidebar-bg: #211f1b; --detail-bg: #1a1814;
+      --border: #333028; --accent: #60a5fa; --accent2: #a78bfa;
+      --text: #e8e0d4; --text-muted: #8a8070; --text-light: #5a5248;
+      --usage-bg: #211f1b; --note-bg: #2a1f14; --note-border: #e67e22;
+      --morph-bg: #161c2e; --morph-border: #4a6fa5;
+      --tag-bg: #1a2240; --tag-color: #8ab4f8; --active-bg: #2563eb;
+      --ref-bg: #2a2010; --ref-color: #f0a060; --ref-border: #c07830;
+      --bold-color: #60a5fa;
+      --def-bg: #2a4a35; --def-color: #c8dcc9;
+      --content-bg: #1e4d35; --content-color: #c8e6c9;
+      --def-link-color: #ffb74d; --def-link-hover: #ffcc80;
+      --content-link-color: #ff8a65; --content-link-hover: #ffab91;
+      --vi-bg: #052e16; --vi-border: #16a34a; --vi-color: #4ade80;
+      --ko-color: #6b7280;
+      --section-blue: #93c5fd; --section-blue-contrast: #07111f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-body); font-size: var(--font-size);
+      background: var(--bg); color: var(--text);
+      display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+      transition: background 0.2s, color 0.2s;
+      -webkit-text-size-adjust: 100%;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* ══ TOOLBAR ══════════════════════════════════════════════════════ */
+    #toolbar {
+      display: flex; align-items: center; gap: 2px;
+      padding: 0 10px; height: 46px; min-height: 46px;
+      background: var(--sidebar-bg); border-bottom: 1px solid var(--border);
+      user-select: none; z-index: 100; overflow-x: auto; flex-shrink: 0;
+    }
+    #toolbar::-webkit-scrollbar { height: 0; }
+    .tb-group {
+      display: flex; align-items: center; gap: 2px;
+      padding: 0 6px; border-right: 1px solid var(--border); flex-shrink: 0;
+    }
+    .tb-group:last-child { border-right: none; }
+    .tb-btn {
+      display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+      border: none; background: transparent; color: var(--text-muted);
+      border-radius: 5px; cursor: pointer; font-size: 12px;
+      font-family: var(--font-body); font-weight: 500; white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
+      min-height: 44px; min-width: 44px;
+      justify-content: center;
+    }
+    .tb-btn:hover { background: var(--border); color: var(--text); }
+    .tb-btn:disabled { opacity: 0.3; cursor: default; }
+    .tb-btn:disabled:hover { background: transparent; }
+    .tb-label {
+      font-size: 10px; font-weight: 700; color: var(--text-light);
+      padding: 0 3px; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .tb-select {
+      border: 1px solid var(--border); background: var(--bg); color: var(--text);
+      border-radius: 5px; padding: 3px 6px; font-size: 12px;
+      font-family: var(--font-body); cursor: pointer; outline: none;
+      min-height: 44px;
+    }
+
+    /* Dict picker nổi bật hơn */
+    #dict-picker {
+      border: 1.5px solid var(--accent); background: var(--bg); color: var(--text);
+      border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600;
+      font-family: var(--font-body); cursor: pointer; outline: none;
+      max-width: 200px; min-height: 44px;
+    }
+    #dict-info {
+      font-size: 11px; color: var(--text-light); padding: 0 4px;
+      max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* Loading overlay */
+    #dict-loading {
+      display: none; position: fixed; inset: 0; z-index: 999;
+      background: rgba(0,0,0,0.18); align-items: center; justify-content: center;
+    }
+    #dict-loading span {
+      background: var(--sidebar-bg); color: var(--text);
+      padding: 14px 28px; border-radius: 10px; font-size: 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+
+    #font-size-display {
+      font-size: 11px; font-weight: 700; color: var(--accent);
+      min-width: 34px; text-align: center;
+    }
+    #font-size-slider {
+      -webkit-appearance: none; appearance: none;
+      width: 90px; height: 4px; background: var(--border);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    #font-size-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+
+    /* ══ LAYOUT ═══════════════════════════════════════════════════════ */
+    #app { display: flex; flex: 1; overflow: hidden; min-height: 0; }
+
+    /* ══ SIDEBAR ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width: var(--sidebar-width); min-width: 140px; max-width: 50vw;
+      background: var(--sidebar-bg); border-right: none;
+      display: flex; flex-direction: column; transition: background 0.2s; flex-shrink: 0;
+    }
+    #search-box { padding: 10px 10px 6px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #search-input {
+      width: 100%; padding: 7px 11px; border: 1px solid var(--border);
+      border-radius: 7px; font-size: 13px; font-family: var(--font-body);
+      outline: none; background: var(--bg); color: var(--text); transition: border-color 0.15s;
+      min-height: 44px;
+    }
+    #search-input:focus { border-color: var(--accent); }
+    #search-input::placeholder { color: var(--text-light); }
+    #word-count { font-size: 11px; color: var(--text-light); padding: 4px 2px 0; }
+    #word-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+    .word-item {
+      padding: 7px 14px; cursor: pointer; border-radius: 6px; margin: 1px 5px;
+      display: flex; flex-direction: column; gap: 1px; transition: background 0.1s;
+      min-height: 44px; justify-content: center;
+    }
+    .word-item:hover { background: var(--border); }
+    .word-item.active { background: var(--active-bg); color: #fff; }
+    .w-word { font-family: var(--font-korean); font-size: 14px; font-weight: 600; }
+    .w-meaning { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .word-item.active .w-meaning { color: rgba(255,255,255,0.65); }
+
+    /* ══ HISTORY ══════════════════════════════════════════════════════ */
+    #history-panel {
+      width: var(--history-width); min-width: 60px; max-width: 35vw; background: var(--sidebar-bg);
+      border-left: none; display: flex; flex-direction: column;
+      flex-shrink: 0; overflow: hidden;
+    }
+    .history-title {
+      padding: 8px 8px 5px; color: var(--text-muted); font-size: 11px;
+      font-weight: 700;
+    }
+    .history-actions {
+      display: flex; gap: 4px; padding: 0 6px 5px; border-bottom: 1px solid var(--border);
+    }
+    .side-btn {
+      flex: 1; border: 1px solid var(--border); background: var(--bg); color: var(--text-muted);
+      border-radius: 6px; padding: 4px 5px; font-size: 10px; font-weight: 700;
+      font-family: var(--font-body); cursor: pointer; min-height: 32px;
+    }
+    .side-btn:hover { border-color: var(--section-blue); color: var(--section-blue); }
+    .side-btn:disabled { opacity: 0.45; cursor: default; }
+    .side-btn:disabled:hover { border-color: var(--border); color: var(--text-muted); }
+    #history-area {
+      display: flex; flex-direction: column; min-height: 120px; flex: 1; overflow: hidden;
+    }
+    #history-bar {
+      display: flex; flex-direction: column; flex: 1; overflow-y: auto; padding: 4px 3px;
+      font-size: 13px; color: var(--text-muted);
+    }
+    .history-empty { padding: 8px 6px; color: var(--text-light); line-height: 1.45; }
+    .hist-item {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 0px;
+      padding: 3px 4px; border-radius: 4px; margin-bottom: 1px;
+      font-family: var(--font-korean); font-weight: 700;
+      color: var(--ref-color); cursor: pointer;
+      transition: background 0.12s;
+      font-size: 14px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .hist-item:hover { background: var(--border); }
+    .hist-item.current {
+      background: var(--tag-bg); color: var(--text); cursor: default;
+    }
+    .hist-item .hist-num {
+      color: var(--section-blue); font-weight: 700; font-size: 11px;
+      min-width: 14px; flex-shrink: 0;
+    }
+    .hist-word { font-family: var(--font-korean); font-weight: 700; color: var(--ref-color); font-size: 14px; }
+    .hist-meaning { display: block; font-size: 11px; color: var(--text-light); font-family: var(--font-body); font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 0px; }
+    .hist-item.current .hist-meaning { color: rgba(255,255,255,0.5); }
+    #history-bar.history-hidden { display: none; }
+
+    /* ════ LUU KÝ INLINE EDIT IN DETAIL ════ */
+    .luu-ky-inline {
+      margin: 8px 0 12px; border: 2px solid #ef6c00; border-radius: 8px;
+      background: #fff3e0; overflow: hidden;
+    }
+    .luu-ky-inline-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px; background: #ef6c00; color: #fff;
+      font-weight: 700; font-size: 0.88em;
+    }
+    .luu-ky-inline-header button {
+      border: none; background: rgba(255,255,255,0.25); color: #fff;
+      border-radius: 4px; padding: 2px 8px; font-size: 0.9em;
+      cursor: pointer; font-weight: 600;
+    }
+    .luu-ky-inline-header button:hover { background: rgba(255,255,255,0.4); }
+    .luu-ky-inline-body {
+      padding: 8px 12px; font-size: 0.93em; line-height: 1.6; color: #5d4037;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .luu-ky-inline-edit {
+      padding: 8px 12px;
+    }
+    .luu-ky-inline-edit textarea {
+      width: 100%; min-height: 60px; border: 1px solid #ef6c00; border-radius: 6px;
+      background: #fff8f0; color: #5d4037; font-size: 0.93em;
+      padding: 8px; line-height: 1.5; resize: vertical; outline: none;
+      font-family: var(--font-body);
+    }
+    .luu-ky-inline-edit textarea:focus { border-color: #e65100; }
+    .luu-ky-inline-actions {
+      display: flex; gap: 6px; margin-top: 6px; padding: 0 12px 8px;
+    }
+    .luu-ky-inline-actions button {
+      border: none; border-radius: 4px; padding: 4px 10px;
+      font-size: 0.82em; cursor: pointer; font-weight: 600;
+      font-family: var(--font-body);
+    }
+    .luu-ky-btn-save { background: #ef6c00; color: #fff; }
+    .luu-ky-btn-save:hover { background: #e65100; }
+    .luu-ky-btn-append { background: #f57c00; color: #fff; }
+    .luu-ky-btn-append:hover { background: #ef6c00; }
+    .luu-ky-btn-cancel { background: #e0e0e0; color: #555; }
+    .luu-ky-btn-cancel:hover { background: #d0d0d0; }
+    .luu-ky-btn-edit { background: rgba(255,255,255,0.25); color: #fff; }
+    .luu-ky-btn-edit:hover { background: rgba(255,255,255,0.4); }
+    [data-theme="dark"] .luu-ky-inline { background: #2a1f10 !important; border-color: #f57c00 !important; }
+    [data-theme="dark"] .luu-ky-inline-header { background: #8b4513 !important; color: #f0c080 !important; }
+    [data-theme="dark"] .luu-ky-inline-body { color: #f0c080 !important; }
+    [data-theme="dark"] .luu-ky-inline-edit textarea { background: #1a1408 !important; color: #f0c080 !important; border-color: #8b4513 !important; }
+    [data-theme="dark"] .luu-ky-btn-cancel { background: #333; color: #ccc; }
+    .edit-box {
+      border-top: 1px solid var(--border); padding: 6px 5px; background: var(--sidebar-bg);
+      display: flex; flex-direction: column; gap: 4px; max-height: 40%;
+    }
+    .edit-title { color: var(--text-muted); font-size: 12px; font-weight: 800; }
+    /* ══ RESIZE HANDLES ═══════════════════════════════════════════ */
+    .resize-handle {
+      width: 5px; cursor: col-resize; flex-shrink: 0;
+      background: var(--border); position: relative; z-index: 10;
+      transition: background 0.15s;
+    }
+    .resize-handle:hover,
+    .resize-handle.active {
+      background: var(--accent);
+    }
+    .resize-handle::after {
+      content: ''; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 3px; height: 30px; border-radius: 2px;
+      background: rgba(0,0,0,0.15);
+    }
+    .resize-handle:hover::after,
+    .resize-handle.active::after {
+      background: rgba(255,255,255,0.5);
+    }
+    [data-theme="dark"] .resize-handle::after {
+      background: rgba(255,255,255,0.12);
+    }
+    [data-theme="dark"] .resize-handle:hover::after,
+    [data-theme="dark"] .resize-handle.active::after {
+      background: rgba(255,255,255,0.5);
+    }
+
+    /* ════ GREEN BLOCKS (Definition & Content) ════ */
+    .def-block {
+      background: var(--def-bg); color: var(--def-color); border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 12px; line-height: 1.6;
+    }
+    .def-block .def-ko {
+      font-style: italic; font-size: 0.93em; margin-bottom: 4px;
+      font-family: var(--font-korean); opacity: 0.9;
+    }
+    .def-block .def-vi {
+      font-weight: 500; font-size: 1em;
+    }
+    /* Liên kết nội bộ trong khối xanh đậm (definition) — màu cam */
+    .def-block .ref-link,
+    .def-block .dict-ref {
+      color: var(--def-link-color) !important;
+      background: rgba(255,152,0,0.15) !important;
+      border-bottom-color: var(--def-link-color) !important;
+    }
+    .def-block .ref-link:hover,
+    .def-block .dict-ref:hover {
+      color: var(--def-link-hover) !important;
+      background: rgba(255,152,0,0.3) !important;
+    }
+    /* Liên kết nội bộ trong khối xanh nhạt (content) — màu cam đậm */
+    .content-block .ref-link,
+    .content-block .dict-ref {
+      color: var(--content-link-color) !important;
+      background: rgba(230,81,0,0.1) !important;
+      border-bottom-color: var(--content-link-color) !important;
+    }
+    .content-block .ref-link:hover,
+    .content-block .dict-ref:hover {
+      color: var(--content-link-hover) !important;
+      background: rgba(230,81,0,0.2) !important;
+    }
+    .content-block {
+      background: var(--content-bg); color: var(--content-color); border-radius: 8px;
+      padding: 10px 14px; margin: 8px 0 12px 0; line-height: 1.6;
+      font-size: 0.95em;
+    }
+    .content-block .content-ko {
+      font-family: var(--font-korean); margin-bottom: 4px; opacity: 0.85;
+      font-size: 0.92em;
+    }
+    .content-block .content-vi {
+      font-weight: 500;
+    }
+    [data-theme="dark"] .luu-ky-block { background: #2a1f10 !important; border-left-color: #f57c00 !important; color: #f0c080 !important; }
+    [data-theme="dark"] .content-block { background: #1e4d35 !important; color: #c8e6c9 !important; }
+    [data-theme="dark"] .def-block { background: #2a4a35 !important; color: #c8dcc9 !important; }
+
+    .edit-input, .edit-textarea {
+      width: 100%; border: 1px solid var(--border); border-radius: 6px;
+      background: var(--bg); color: var(--text); font-family: var(--font-body);
+      font-size: 12px; outline: none;
+    }
+    .edit-input { padding: 7px 8px; }
+    .edit-textarea { min-height: 104px; resize: vertical; padding: 8px; line-height: 1.45; }
+    .edit-input:focus, .edit-textarea:focus { border-color: var(--section-blue); }
+    .edit-actions { display: flex; gap: 6px; }
+    .edit-status { min-height: 16px; color: var(--text-light); font-size: 11px; line-height: 1.35; }
+    .correction-box {
+      margin: 18px 0 0; padding: 12px 14px; border: 1px solid var(--section-blue);
+      border-left-width: 4px; border-radius: 8px; background: var(--tag-bg);
+    }
+    .correction-title { color: var(--section-blue); font-weight: 800; margin-bottom: 7px; }
+    .correction-body { white-space: pre-line; line-height: 1.65; color: var(--text); }
+
+    /* ══ DETAIL ═══════════════════════════════════════════════════════ */
+    #detail {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: 32px 40px; background: var(--detail-bg); transition: background 0.2s;
+      -webkit-overflow-scrolling: touch;
+    }
+    #detail * { word-break: break-word; overflow-wrap: break-word; }
+
+    .d-word {
+      font-family: var(--font-korean); font-size: clamp(28px, 6vw, 56px);
+      font-weight: 700; color: var(--accent); letter-spacing: -0.01em;
+      margin-bottom: 4px; line-height: 1.2; white-space: normal;
+    }
+    .d-variants { font-size: 0.8em; color: var(--text-light); margin-bottom: 5px; font-family: var(--font-korean); }
+    .d-meaning { font-size: 1.3em; font-weight: 500; color: var(--text); margin-bottom: 10px; line-height: 1.45; }
+    .d-definition { font-size: 0.87em; color: var(--text-muted); background: var(--usage-bg); border: 1px solid var(--border); padding: 9px 14px; border-radius: 8px 8px 0 0; margin-bottom: 0; line-height: 1.6; font-family: var(--font-korean); }
+    .d-definition.vi { background: var(--vi-bg); border-color: var(--vi-border); color: var(--vi-color); font-family: var(--font-body); border-radius: 8px 8px 0 0; margin-bottom: 0; }
+    .d-definition.ko { background: var(--usage-bg); border-top: none; border-radius: 0 0 8px 8px; margin-bottom: 16px; font-size: 0.8em; color: var(--ko-color); }
+    .meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .meta-tag { background: var(--tag-bg); color: var(--tag-color); padding: 3px 11px; border-radius: 20px; font-size: 0.8em; font-weight: 600; }
+    .related-tag { background: var(--tag-bg); color: var(--tag-color); padding: 3px 11px; border-radius: 20px; font-size: 0.8em; font-weight: 600; cursor: pointer; border: 1px solid transparent; font-family: var(--font-korean); transition: background 0.15s, border-color 0.15s, color 0.15s; }
+    .related-tag:hover { border-color: var(--accent); background: var(--bg); color: var(--accent); }
+    .d-morphology { font-size: 0.85em; color: var(--text); background: var(--morph-bg); border-left: 3px solid var(--morph-border); padding: 9px 14px; border-radius: 0 8px 8px 0; margin-bottom: 6px; line-height: 1.65; font-family: var(--font-korean); }
+    .d-morphology.vi { background: var(--vi-bg); border-left-color: var(--vi-border); color: var(--vi-color); font-family: var(--font-body); margin-bottom: 4px; }
+    .d-morphology.ko { font-size: 0.78em; color: var(--ko-color); background: transparent; border-left: 2px solid var(--border); margin-bottom: 22px; padding: 4px 10px; }
+    .section-block { margin-bottom: 28px; }
+    .section-title, .section-title-national { font-size: 1.25em; line-height: 1.35; font-weight: 800; color: var(--section-blue); letter-spacing: 0; text-transform: none; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+    .usage-block { margin-bottom: 12px; padding: 14px 18px; background: var(--usage-bg); border-radius: 10px; border: 1px solid var(--border); }
+    .usage-index, .usage-index-national { display: inline-flex; align-items: center; background: var(--section-blue); color: var(--section-blue-contrast); font-size: 0.72em; font-weight: 800; padding: 2px 9px; border-radius: 10px; margin: 0 8px 9px 0; letter-spacing: 0; }
+    .usage-explanation.vi { font-size: 1em; color: var(--vi-color); margin-bottom: 4px; line-height: 1.65; font-family: var(--font-body); background: var(--vi-bg); border-left: 3px solid var(--vi-border); padding: 6px 12px; border-radius: 0 6px 6px 0; }
+    .usage-explanation.ko { font-size: 0.82em; color: var(--ko-color); margin-bottom: 10px; line-height: 1.6; font-family: var(--font-korean); }
+    .usage-explanation { font-size: 0.9em; color: var(--text); margin-bottom: 11px; line-height: 1.7; font-family: var(--font-korean); }
+    .example-item { font-size: 0.9em; color: var(--text); padding: 5px 0 5px 14px; border-left: 2px solid var(--border); margin-bottom: 5px; line-height: 1.75; white-space: pre-line; font-family: var(--font-korean); word-break: break-word; }
+    .note-block { margin-top: 11px; font-size: 0.83em; color: var(--text); background: var(--note-bg); border-left: 3px solid var(--note-border); padding: 9px 14px; border-radius: 0 8px 8px 0; line-height: 1.7; font-family: var(--font-korean); margin-bottom: 0; }
+    .note-block::before { content: "❃ "; color: var(--note-border); font-weight: 700; }
+    .note-block.vi { background: var(--vi-bg); border-left-color: var(--vi-border); color: var(--vi-color); font-family: var(--font-body); border-radius: 0 6px 0 0; margin-bottom: 0; }
+    .note-block.vi::before { content: "❃ "; color: var(--vi-border); }
+    .note-block.ko { background: var(--note-bg); border-left-color: var(--border); color: var(--ko-color); font-size: 0.78em; border-radius: 0 0 6px 6px; margin-top: 0; border-top: 1px solid var(--border); }
+    .note-block.ko::before { content: ""; }
+    .bold-term { font-weight: 700; color: var(--bold-color); }
+    .ref-link { color: var(--ref-color); background: var(--ref-bg); border-bottom: 1px dashed var(--ref-border); border-radius: 3px; padding: 0 2px; cursor: pointer; font-weight: 600; font-family: var(--font-korean); transition: background 0.15s, color 0.15s; }
+    .ref-link:hover { background: var(--ref-border); color: #fff; border-bottom-color: transparent; }
+    .ref-link::after { content: " ↗"; font-size: 0.75em; opacity: 0.6; }
+    #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--text-light); gap: 12px; }
+    #empty-state p { font-size: 15px; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ══ MOBILE BACK BUTTON (shown only on mobile) ════ */
+    #mobile-back {
+      display: none; position: fixed; bottom: 20px; right: 20px; z-index: 200;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--accent); color: #fff; border: none;
+      font-size: 24px; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      align-items: center; justify-content: center;
+      touch-action: manipulation;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       MOBILE RESPONSIVE — Screens <= 768px
+       ══════════════════════════════════════════════════════════════════════ */
+    @media (max-width: 768px) {
+      /* Toolbar: hide less-used groups, keep essential */
+      .tb-group:nth-child(3),  /* Font family */
+      .tb-group:nth-child(4) { /* Sidebar width */
+        display: none;
+      }
+      #toolbar {
+        height: 52px; min-height: 52px;
+        padding: 0 6px;
+      }
+      .tb-btn { font-size: 13px; min-height: 44px; min-width: 44px; }
+      #dict-picker { font-size: 13px; max-width: 150px; }
+      #dict-info { display: none; }
+      #font-size-slider { width: 60px; }
+
+      /* Layout: sidebar as full-width overlay on mobile */
+      #app { position: relative; }
+
+      #sidebar {
+        position: fixed; top: 52px; left: 0; bottom: 0;
+        width: 100% !important; min-width: 100% !important;
+        z-index: 50;
+        transform: translateX(0);
+        transition: transform 0.3s ease;
+      }
+      #sidebar.sidebar-hidden {
+        transform: translateX(-100%);
+        pointer-events: none;
+      }
+
+      /* Detail takes full width */
+      #detail {
+        width: 100%; padding: 16px 14px;
+        margin-left: 0;
+      }
+
+      /* Hide history panel on mobile */
+      #history-panel { display: none !important; }
+
+      /* Mobile back button visible */
+      #mobile-back { display: flex; }
+
+      /* Larger touch targets */
+      .word-item { padding: 10px 14px; min-height: 48px; }
+      .w-word { font-size: 15px; }
+      .w-meaning { font-size: 12px; }
+
+      /* Adjust detail typography for mobile */
+      .d-word { font-size: clamp(24px, 8vw, 40px); }
+      .d-meaning { font-size: 1.1em; }
+
+      /* Reduce padding in usage blocks */
+      .usage-block { padding: 10px 12px; }
+      .section-block { margin-bottom: 18px; }
+    }
+
+    /* Extra small screens */
+    @media (max-width: 400px) {
+      .tb-group { padding: 0 3px; }
+      .tb-label { font-size: 9px; }
+      #dict-picker { max-width: 120px; font-size: 12px; }
+      #font-size-slider { width: 40px; }
+      .tb-group:nth-child(2) .tb-label { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ TOOLBAR ══════════════════════════════════════════════════════ -->
+<div id="toolbar">
+
+  <!-- Chọn từ điển — đặt đầu tiên, nổi bật nhất -->
+  <div class="tb-group">
+    <span class="tb-label">📚 Từ điển</span>
+    <select id="dict-picker"></select>
+    <span id="dict-info"></span>
+  </div>
+
+  <!-- Font size -->
+  <div class="tb-group">
+    <span class="tb-label">Cỡ chữ</span>
+    <button class="tb-btn" id="zoom-out">A−</button>
+    <input type="range" id="font-size-slider" min="0" max="19" value="4" step="1">
+    <button class="tb-btn" id="zoom-in">A+</button>
+    <span id="font-size-display">15px</span>
+    <button class="tb-btn" id="zoom-reset" title="Reset 15px">↺</button>
+  </div>
+
+  <!-- Font family -->
+  <div class="tb-group">
+    <span class="tb-label">Font</span>
+    <select class="tb-select" id="font-picker">
+      <option value="serif">Noto Serif KR</option>
+      <option value="sans">Be Vietnam Pro</option>
+      <option value="mono">Monospace</option>
+    </select>
+  </div>
+
+  <!-- Sidebar width -->
+  <div class="tb-group">
+    <span class="tb-label">Từ</span>
+    <button class="tb-btn" id="sidebar-narrow">◂</button>
+    <button class="tb-btn" id="sidebar-wide">▸</button>
+  </div>
+
+  <!-- History panel width -->
+  <div class="tb-group">
+    <span class="tb-label">Lịch sử</span>
+    <button class="tb-btn" id="history-narrow">◂</button>
+    <button class="tb-btn" id="history-wide">▸</button>
+  </div>
+
+  <!-- Điều hướng -->
+  <div class="tb-group">
+    <span class="tb-label">Điều hướng</span>
+    <button class="tb-btn" id="nav-back" disabled>← Lùi</button>
+    <button class="tb-btn" id="nav-forward" disabled>Tiến →</button>
+  </div>
+
+  <!-- Dark mode -->
+  <div class="tb-group" style="border-right:none; margin-left:auto;">
+    <button class="tb-btn" id="toggle-theme">◑ Dark</button>
+  </div>
+
+</div>
+
+<!-- ══ MAIN ══════════════════════════════════════════════════════════ -->
+<div id="app">
+  <div id="sidebar">
+    <div id="search-box">
+      <input id="search-input" type="text" placeholder="🔍 Tìm từ..." />
+      <div id="word-count"></div>
+    </div>
+    <div id="word-list"></div>
+  </div>
+  <div class="resize-handle" id="resize-sidebar"></div>
+  <div id="detail">
+    <div id="empty-state">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+      </svg>
+      <p>← Chọn một từ để xem chi tiết</p>
+    </div>
+  </div>
+  <div class="resize-handle" id="resize-history"></div>
+  <aside id="history-panel">
+    <div class="history-title">Lịch sử tra cứu</div>
+    <div class="history-actions">
+      <button class="side-btn" id="history-toggle">Ẩn</button>
+      <button class="side-btn" id="history-clear">Xóa</button>
+    </div>
+    <div id="history-area">
+      <div id="history-bar">
+        <div class="history-empty">Chưa có lịch sử.</div>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<!-- ══ LOADING OVERLAY ════════════════════════════════════════════════ -->
+<div id="dict-loading">
+  <span>⏳ Đang tải từ điển...</span>
+</div>
+
+<!-- ══ MOBILE BACK BUTTON ═════════════════════════════════════════════ -->
+<button id="mobile-back" aria-label="Quay lại danh sách">☰</button>
+
+<script src="main.js"></script>
+</body>
+</html>

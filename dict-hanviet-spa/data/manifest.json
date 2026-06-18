@@ -1,0 +1,14 @@
+[
+  {
+    "file": "data_national.json",
+    "name": "한국어 문법 - 국립국어원",
+    "lang": "한",
+    "description": "Từ điển ngữ pháp tiếng Hàn - Nguồn Quốc gia (879 mục từ)"
+  },
+  {
+    "file": "data_Kim.json",
+    "name": "한국어 문법 - 김종식",
+    "lang": "한",
+    "description": "Từ điển ngữ pháp tiếng Hàn - Nguồn Kim (507 mục từ)"
+  }
+]
