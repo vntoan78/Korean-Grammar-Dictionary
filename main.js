@@ -63,6 +63,78 @@ const fontSizes = [11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 26, 28, 32, 36, 4
 let fontSizeIdx = 4; // Mặc định hiển thị cỡ chữ 15px
 
 let globalDicts = []; // Lưu trữ danh sách các bộ từ điển đọc từ manifest
+let currentDictFile = ''; // ★ Track file từ điển đang dùng (cho annotation metadata)
+
+// ══════════════════════════════════════════════════════════════════════
+//  ANNOTATION STORAGE — Lưu ký với metadata timestamp
+//  Storage scheme:
+//    dict_annotation_<word>      → nội dung ghi chú (string)
+//    dict_annotation_meta_<word> → JSON {created_at, updated_at, dict_source}
+//  Khi export/import, gộp cả 2 thành object annotation hoàn chỉnh
+// ══════════════════════════════════════════════════════════════════════
+
+function getAnnotationMeta(word) {
+  if (!word) return null;
+  try {
+    const raw = localStorage.getItem(`dict_annotation_meta_${word}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+
+function setAnnotationMeta(word, dictSource, isUpdate) {
+  if (!word) return;
+  const now = new Date().toISOString();
+  const existing = getAnnotationMeta(word) || {};
+  const meta = {
+    created_at: existing.created_at || now,
+    updated_at: now,
+    dict_source: dictSource || existing.dict_source || '',
+  };
+  localStorage.setItem(`dict_annotation_meta_${word}`, JSON.stringify(meta));
+}
+
+function removeAnnotationMeta(word) {
+  if (!word) return;
+  localStorage.removeItem(`dict_annotation_meta_${word}`);
+}
+
+// Lưu annotation đầy đủ (content + meta) — dùng chung cho mọi nơi
+function saveAnnotation(word, content, dictSource) {
+  if (!word) return;
+  if (content) {
+    localStorage.setItem(`dict_annotation_${word}`, content);
+    setAnnotationMeta(word, dictSource, true);
+  } else {
+    localStorage.removeItem(`dict_annotation_${word}`);
+    removeAnnotationMeta(word);
+  }
+}
+
+// Lấy tất cả annotation trong localStorage — trả về mảng đã sắp xếp theo updated_at giảm dần
+function getAllAnnotations() {
+  const list = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith('dict_annotation_') || key.startsWith('dict_annotation_meta_')) continue;
+    const word = key.substring('dict_annotation_'.length);
+    const content = localStorage.getItem(key);
+    if (!content) continue;
+    const meta = getAnnotationMeta(word) || {};
+    list.push({
+      word: word,
+      luu_ky: content,
+      created_at: meta.created_at || null,
+      updated_at: meta.updated_at || null,
+      dict_source: meta.dict_source || '',
+    });
+  }
+  list.sort((a, b) => {
+    const ta = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+    const tb = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+    return tb - ta;
+  });
+  return list;
+}
 
 // ── Hiển thị lỗi trong UI (thay vì chỉ console) ──────────────────────────
 function showErrorInUI(title, detail) {
@@ -578,6 +650,16 @@ async function switchDictionary(filename, meta) {
     const raw = await loadDataFile(filename);
     allWords = Array.isArray(raw) ? raw : (typeof raw === "string" ? JSON.parse(raw) : raw);
 
+    // ★ Track dict đang dùng — để ghi vào annotation metadata
+    currentDictFile = filename;
+
+    // ★ Apply annotation đã lưu (localStorage) vào allWords để showDetail hiển thị
+    allWords.forEach((w) => {
+      const saved = localStorage.getItem(`dict_annotation_${w.word}`);
+      if (saved) w.luu_ky = saved;
+      else delete w.luu_ky;
+    });
+
     navHistory = [];
     navPos = -1;
     updateNavButtons();
@@ -1001,19 +1083,21 @@ if (editSave) {
       if (editStatus) editStatus.textContent = "⚠ Chưa nhập từ!";
       return;
     }
-    // Update allWords entry directly
+    // Update allWords entry directly + localStorage (with metadata)
     const entry = allWords.find(w => w.word === word);
     if (content) {
       if (entry) entry.luu_ky = content;
-      localStorage.setItem(`dict_annotation_${word}`, content);
+      saveAnnotation(word, content, currentDictFile);
       if (editStatus) editStatus.textContent = `✓ Đã lưu ký cho "${word}"`;
     } else {
       if (entry) delete entry.luu_ky;
-      localStorage.removeItem(`dict_annotation_${word}`);
+      saveAnnotation(word, '', currentDictFile); // xóa
       if (editStatus) editStatus.textContent = `✓ Đã xóa lưu ký cho "${word}"`;
     }
     // Refresh detail view if this word is currently displayed
     if (entry && currentAnnotWord === word) showDetail(entry);
+    // ★ Update notes button badge
+    updateNotesButtonBadge();
   });
 }
 
@@ -1426,19 +1510,21 @@ function bindLuuKyInline(container) {
       const word = inline.dataset.luuWord;
       const textarea = inline.querySelector("textarea");
       const content = textarea ? textarea.value.trim() : "";
-      // Lưu vào allWords và localStorage
+      // Lưu vào allWords và localStorage (with metadata)
       const entry = allWords.find(w => w.word === word);
       if (content) {
         if (entry) entry.luu_ky = content;
-        localStorage.setItem(`dict_annotation_${word}`, content);
+        saveAnnotation(word, content, currentDictFile);
       } else {
         if (entry) delete entry.luu_ky;
-        localStorage.removeItem(`dict_annotation_${word}`);
+        saveAnnotation(word, '', currentDictFile);
       }
       // Cập nhật sidebar edit box
       updateEditBox(word);
       // Refresh detail
       if (entry) showDetail(entry);
+      // ★ Update notes button badge
+      updateNotesButtonBadge();
     });
   });
 
@@ -1459,11 +1545,13 @@ function bindLuuKyInline(container) {
       const separator = oldContent ? "\n" : "";
       const combined = oldContent + separator + newContent;
       if (entry) entry.luu_ky = combined;
-      localStorage.setItem(`dict_annotation_${word}`, combined);
+      saveAnnotation(word, combined, currentDictFile);
       // Cập nhật sidebar edit box
       updateEditBox(word);
       // Refresh detail
       if (entry) showDetail(entry);
+      // ★ Update notes button badge
+      updateNotesButtonBadge();
     });
   });
 
@@ -1864,3 +1952,378 @@ window.selectWord = selectWord;
     });
   }
 })();
+
+// ══════════════════════════════════════════════════════════════════════
+//  QUẢN LÝ GHI CHÚ (NOTES MANAGER)
+//  - Modal xem tất cả annotation
+//  - Export → JSON file (cho maintainer merge vào data)
+//  - Import → từ JSON file (chuyển máy, nhận update từ maintainer)
+//  - Clear all → xóa toàn bộ annotation
+// ══════════════════════════════════════════════════════════════════════
+
+// Toast notification — hiển thị thông báo ngắn
+function showToast(msg, type) {
+  let toast = document.getElementById('toast-notification');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.style.cssText = `
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px);
+      background: var(--text); color: var(--bg); padding: 12px 24px;
+      border-radius: 8px; font-size: 14px; font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25); z-index: 9999;
+      opacity: 0; transition: opacity 0.3s, transform 0.3s;
+      max-width: 90vw; text-align: center; pointer-events: none;
+      font-family: var(--font-body);
+    `;
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  // Color by type
+  if (type === 'error') {
+    toast.style.background = '#d32f2f';
+    toast.style.color = '#fff';
+  } else if (type === 'success') {
+    toast.style.background = '#2e7d32';
+    toast.style.color = '#fff';
+  } else {
+    toast.style.background = '';
+    toast.style.color = '';
+  }
+  // Animate in
+  toast.style.opacity = '1';
+  toast.style.transform = 'translateX(-50%) translateY(0)';
+  // Auto-hide after 3 seconds
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 3000);
+}
+
+// Cập nhật badge trên nút "Ghi chú" trong toolbar
+function updateNotesButtonBadge() {
+  const btn = document.getElementById('notes-manager-btn');
+  if (!btn) return;
+  const count = getAllAnnotations().length;
+  let badge = btn.querySelector('.notes-badge');
+  if (count > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'notes-badge';
+      btn.appendChild(badge);
+    }
+    badge.textContent = count;
+  } else if (badge) {
+    badge.remove();
+  }
+}
+
+// Mở modal quản lý ghi chú
+function openNotesModal() {
+  const modal = document.getElementById('notes-modal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+  renderNotesList();
+}
+
+// Đóng modal
+function closeNotesModal() {
+  const modal = document.getElementById('notes-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+// Render danh sách ghi chú trong modal
+function renderNotesList() {
+  const list = getAllAnnotations();
+  const statsEl = document.getElementById('notes-stats');
+  const listEl = document.getElementById('notes-list');
+
+  if (statsEl) {
+    const lastUpdated = list.length > 0 ? list[0].updated_at : null;
+    const lastUpdatedStr = lastUpdated
+      ? new Date(lastUpdated).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+      : '—';
+    const byDict = {};
+    list.forEach(a => {
+      const d = a.dict_source || '(không rõ)';
+      byDict[d] = (byDict[d] || 0) + 1;
+    });
+    const dictBreakdown = Object.entries(byDict)
+      .map(([k, v]) => `${esc(k)}: ${v}`)
+      .join(' · ') || '—';
+    statsEl.innerHTML = `
+      <div class="stat-row"><span>Tổng số ghi chú:</span><strong>${list.length}</strong></div>
+      <div class="stat-row"><span>Cập nhật cuối:</span><strong>${esc(lastUpdatedStr)}</strong></div>
+      <div class="stat-row"><span>Theo từ điển:</span><strong>${dictBreakdown}</strong></div>
+    `;
+  }
+
+  if (listEl) {
+    if (list.length === 0) {
+      listEl.innerHTML = `
+        <div class="notes-empty">
+          Chưa có ghi chú nào. Hãy mở một từ trong từ điển, viết ghi chú
+          vào khung "📝 Lưu ký" và bấm Lưu.
+        </div>`;
+      return;
+    }
+    listEl.innerHTML = list.map((a, i) => {
+      const updatedStr = a.updated_at
+        ? new Date(a.updated_at).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })
+        : '—';
+      const preview = a.luu_ky.length > 120
+        ? esc(a.luu_ky.substring(0, 120)) + '…'
+        : esc(a.luu_ky);
+      return `
+        <div class="note-item" data-word="${esc(a.word)}">
+          <div class="note-item-header">
+            <span class="note-item-word">${esc(a.word)}</span>
+            <span class="note-item-meta">
+              ${a.dict_source ? `<span class="note-item-dict">${esc(a.dict_source)}</span>` : ''}
+              <span class="note-item-time">⏱ ${esc(updatedStr)}</span>
+            </span>
+          </div>
+          <div class="note-item-preview">${preview}</div>
+          <div class="note-item-actions">
+            <button class="note-jump-btn" data-word="${esc(a.word)}">→ Mở từ</button>
+            <button class="note-delete-btn" data-word="${esc(a.word)}" data-idx="${i}">🗑️ Xóa</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    // Bind events
+    listEl.querySelectorAll('.note-jump-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const word = btn.dataset.word;
+        closeNotesModal();
+        // Jump to word in main app
+        if (typeof jumpToWord === 'function') jumpToWord(word);
+      });
+    });
+    listEl.querySelectorAll('.note-delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const word = btn.dataset.word;
+        if (!confirm(`Xóa ghi chú của từ "${word}"?`)) return;
+        saveAnnotation(word, '', '');
+        // Also remove from allWords if present
+        const entry = allWords.find(w => w.word === word);
+        if (entry) delete entry.luu_ky;
+        // Refresh
+        renderNotesList();
+        updateNotesButtonBadge();
+        // If current detail is this word, refresh
+        if (currentAnnotWord === word && entry) showDetail(entry);
+        showToast(`✓ Đã xóa ghi chú của "${word}"`, 'success');
+      });
+    });
+  }
+}
+
+// Export tất cả ghi chú ra file JSON
+function exportAnnotations() {
+  const list = getAllAnnotations();
+  if (list.length === 0) {
+    showToast('Không có ghi chú nào để xuất.', 'error');
+    return;
+  }
+
+  const exportData = {
+    exported_at: new Date().toISOString(),
+    source: 'dict-hanviet-spa',
+    version: '1.0.0',
+    app_url: window.location.href,
+    total_annotations: list.length,
+    dictionaries: globalDicts.map(d => ({ file: d.file, name: d.name, lang: d.lang })),
+    annotations: list.map(a => ({
+      word: a.word,
+      luu_ky: a.luu_ky,
+      created_at: a.created_at,
+      updated_at: a.updated_at,
+      dict_source: a.dict_source,
+    })),
+  };
+
+  const json = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([json], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const today = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `dict-annotations-${today}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  showToast(`✓ Đã xuất ${list.length} ghi chú ra file JSON`, 'success');
+}
+
+// Import ghi chú từ file JSON — merge vào localStorage (newer wins)
+async function importAnnotations(file) {
+  if (!file) {
+    showToast('Chưa chọn file.', 'error');
+    return;
+  }
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    if (!data || !Array.isArray(data.annotations)) {
+      throw new Error('File không hợp lệ — thiếu mảng "annotations"');
+    }
+
+    let imported = 0, skipped = 0, overwritten = 0;
+    data.annotations.forEach((ann) => {
+      if (!ann || !ann.word || !ann.luu_ky) { skipped++; return; }
+      const word = String(ann.word);
+      const content = String(ann.luu_ky);
+
+      // Check existing — newer timestamp wins
+      const existingMeta = getAnnotationMeta(word) || {};
+      const existingContent = localStorage.getItem(`dict_annotation_${word}`);
+      const existingUpdated = existingMeta.updated_at
+        ? new Date(existingMeta.updated_at).getTime()
+        : 0;
+      const newUpdated = ann.updated_at
+        ? new Date(ann.updated_at).getTime()
+        : Date.now();
+
+      if (existingContent && newUpdated <= existingUpdated) {
+        // Local is newer — skip
+        skipped++;
+        return;
+      }
+      if (existingContent) overwritten++;
+
+      // Save
+      localStorage.setItem(`dict_annotation_${word}`, content);
+      const meta = {
+        created_at: ann.created_at || existingMeta.created_at || new Date().toISOString(),
+        updated_at: ann.updated_at || new Date().toISOString(),
+        dict_source: ann.dict_source || existingMeta.dict_source || '',
+      };
+      localStorage.setItem(`dict_annotation_meta_${word}`, JSON.stringify(meta));
+      imported++;
+
+      // Update in-memory allWords
+      const entry = allWords.find(w => w.word === word);
+      if (entry) entry.luu_ky = content;
+    });
+
+    // Refresh detail if a word is shown
+    if (currentAnnotWord) {
+      const entry = allWords.find(w => w.word === currentAnnotWord);
+      if (entry) showDetail(entry);
+    }
+
+    updateNotesButtonBadge();
+    renderNotesList();
+
+    const msg = `✓ Đã nhập ${imported} ghi chú (${overwritten} ghi đè, ${skipped} bỏ qua)`;
+    showToast(msg, 'success');
+  } catch (e) {
+    showToast(`✗ Lỗi nhập: ${e.message}`, 'error');
+    console.error('Import annotations error:', e);
+  }
+}
+
+// Xóa toàn bộ ghi chú
+function clearAllAnnotations() {
+  const list = getAllAnnotations();
+  if (list.length === 0) {
+    showToast('Không có ghi chú nào để xóa.', 'error');
+    return;
+  }
+  if (!confirm(`Xóa toàn bộ ${list.length} ghi chú?\n\nHành động này không thể hoàn tác. Khuyến nghị xuất file JSON sao lưu trước.`)) {
+    return;
+  }
+  // Collect keys to remove (don't mutate during iteration)
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith('dict_annotation_')) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+
+  // Clear from allWords
+  allWords.forEach(w => delete w.luu_ky);
+
+  // Refresh
+  if (currentAnnotWord) {
+    const entry = allWords.find(w => w.word === currentAnnotWord);
+    if (entry) showDetail(entry);
+  }
+  updateNotesButtonBadge();
+  renderNotesList();
+  showToast(`✓ Đã xóa ${keysToRemove.length / 2 | 0} ghi chú`, 'success');
+}
+
+// ── Bind events cho nút quản lý ghi chú ──────────────────────────────
+(function initNotesManager() {
+  const btn = document.getElementById('notes-manager-btn');
+  if (btn) {
+    btn.addEventListener('click', openNotesModal);
+  }
+
+  const closeBtn = document.getElementById('notes-modal-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', closeNotesModal);
+  }
+
+  const overlay = document.getElementById('notes-modal');
+  if (overlay) {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) closeNotesModal();
+    });
+  }
+
+  const exportBtn = document.getElementById('notes-export-btn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportAnnotations);
+  }
+
+  const importBtn = document.getElementById('notes-import-btn');
+  const fileInput = document.getElementById('notes-import-file');
+  if (importBtn && fileInput) {
+    importBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) importAnnotations(f);
+      e.target.value = ''; // reset để chọn lại cùng file nếu cần
+    });
+  }
+
+  const clearBtn = document.getElementById('notes-clear-btn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', clearAllAnnotations);
+  }
+
+  // ESC to close modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('notes-modal');
+      if (modal && modal.style.display === 'flex') closeNotesModal();
+    }
+  });
+
+  // Init badge on load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateNotesButtonBadge);
+  } else {
+    updateNotesButtonBadge();
+  }
+})();
+
+// Expose cho debug/testing
+window.__notes = {
+  getAll: getAllAnnotations,
+  export: exportAnnotations,
+  import: importAnnotations,
+  clear: clearAllAnnotations,
+  showToast: showToast,
+};
