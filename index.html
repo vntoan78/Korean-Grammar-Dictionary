@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, " />
   <title>Từ điển Ngữ pháp Hàn-Việt</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700&family=Be+Vietnam+Pro:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -59,9 +59,10 @@
     /* ══ TOOLBAR ══════════════════════════════════════════════════════ */
     #toolbar {
       display: flex; align-items: center; gap: 2px;
-      padding: 0 10px; height: 46px; min-height: 46px;
+      padding: 0 10px; min-height: 46px;
       background: var(--sidebar-bg); border-bottom: 1px solid var(--border);
-      user-select: none; z-index: 100; overflow-x: auto; flex-shrink: 0;
+      user-select: none; z-index: 100; flex-shrink: 0;
+      flex-wrap: wrap;
     }
     #toolbar::-webkit-scrollbar { height: 0; }
     .tb-group {
@@ -100,8 +101,8 @@
       max-width: 200px; min-height: 44px;
     }
     #dict-info {
-      font-size: 11px; color: var(--text-light); padding: 0 4px;
-      max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 200px; font-size: 12px; color: var(--text-muted);
     }
 
     /* Loading overlay */
